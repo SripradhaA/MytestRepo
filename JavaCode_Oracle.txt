@@ -1,0 +1,147 @@
+DBHelper:
+
+public static Connection prepareConnection() throws Exception{
+		
+		Connection objConnection = null;	
+		
+		try {
+			Class.forName("oracle.jdbc.driver.OracleDriver");
+			CallableStatement objCallableStatement = null;			
+			objConnection = DriverManager.getConnection(""jdbc:oracle:thin:@172.18.32.216:1521:orcl","lsdb","EMDLSDB");
+			LogUtil.logMessage("Inside the Oracle DB connection");
+			LogUtil.logMessage("outside the ORacle DB");  
+			System.out.println("out of ORacle connection");
+			}		
+		catch(Exception e){
+			LogUtil.logMessage("Inside the catchblock of dbhelper postgre exception"	+ e.getLocalizedMessage());
+			System.out.println("Inside the catchblock of dbhelper postgre exception"	+ e.getLocalizedMessage());
+		}
+		return con1;
+		}
+	
+------------------------------------
+AdmnQueries:
+public static String SP_INSERT_USER = "{call PK_LSDB_ADMN.SP_INSERT_USER(?,?,?,?,?,?,?,?,?,?,?,?,?)}";
+----------------------------------
+Calling Code:
+
+public static int insertUser(UserVO objUserVO) throws EMDException {
+		LogUtil.logMessage("Entering UserMaintDAO.insertUser");
+		System.out.println("Entering UserMaintDAO.insertUser");
+		
+		Connection objConnection = null;
+		
+		CallableStatement objCallableStatement = null;
+		
+		 String strOracleCode = null;
+		 String strErrorMessage = null;
+		int intStatusCode = 0;
+		int intLSDBErrorID = 0;
+		double doubleLSDBErrorID = 0.0;
+		String strMessage = null;
+		String strLogUser = "";
+		try {
+			strLogUser = objUserVO.getUserID();
+			
+			
+			objConnection = DBHelper.prepareConnection();
+			objCallableStatement = objConnection
+			.prepareCall(AdmnQueries.SP_INSERT_USER);
+			
+			objCallableStatement.setString(1, objUserVO.getUserrId());
+			objCallableStatement.setString(2, objUserVO.getEmaillId());
+			objCallableStatement.setString(3, objUserVO.getFirsttName());
+			objCallableStatement.setString(4, objUserVO.getLocation());
+			objCallableStatement.setString(5, objUserVO.getLasttName());
+			objCallableStatement.setString(6, objUserVO.getContacttNo());
+			objCallableStatement.setString(7, objUserVO.getPassword());
+			objCallableStatement.setString(8, objUserVO.getRole());
+			objCallableStatement.setString(9, objUserVO.getUserID());
+			objCallableStatement.setString(10,objUserVO.getServerType()); 
+					
+			LogUtil.logMessage("server Type : " + objUserVO.getServerType() );
+			
+			objCallableStatement.registerOutParameter(11, Types.INTEGER);
+			objCallableStatement.registerOutParameter(12, Types.VARCHAR);
+			objCallableStatement.registerOutParameter(13, Types.VARCHAR);
+			
+			intStatusCode = objCallableStatement.executeUpdate();
+						
+			
+			LogUtil.logMessage("Update Result:" + intStatusCode);
+			System.out.println("Update Result:" + intStatusCode);
+			con.commit();
+			if (intStatusCode > 0) {
+				intStatusCode = 0;
+			}
+			LogUtil.logMessage("Status Update" + intStatusCode);
+			intLSDBErrorID = objCallableStatement.getInt(11);
+			LogUtil.logMessage("LSDBErrorID:" + intLSDBErrorID);
+			LogUtil.logMessage("LSDBErrorID:" + doubleLSDBErrorID);
+			strOracleCode = objCallableStatement.getString(12);
+			LogUtil.logMessage("OracleErrorCode:" + strOracleCode);
+			strErrorMessage = (String) objCallableStatement.getString(13);
+			
+			LogUtil.logMessage("ErrorMessage:" + strErrorMessage);
+			if (doubleLSDBErrorID != 0) {
+					LogUtil.logMessage("Enters into Error Loop:");
+					ErrorInfo objErrorInfo = new ErrorInfo();
+					strMessage = String.valueOf(doubleLSDBErrorID);
+					LogUtil.logMessage("Error message in DAO:" + strMessage);
+				objErrorInfo.setMessageID(strMessage);
+				LogUtil.logMessage("Error message in ErrorInfo:"
+						+ objErrorInfo.getMessageID());
+				
+				throw new DataAccessException(objErrorInfo);
+				
+			} else if (strOracleCode != null && !"0".equals(strOracleCode)) {
+				LogUtil.logMessage("enters into oracle error code block:"
+						+ strOracleCode);
+				ErrorInfo objErrorInfo = new ErrorInfo();
+				StringBuffer objStBuffer = new StringBuffer();
+				objStBuffer.append(strOracleCode + " ");
+				objStBuffer.append(strErrorMessage);
+				objErrorInfo.setMessage(objStBuffer.toString());
+				//objConnection.rollback();
+				con.rollback();
+				throw new ApplicationException(objErrorInfo);
+			}
+		} catch (DataAccessException objDataExp) {
+			LogUtil
+			.logMessage("Enters into DataAccessException UserMaintDAO.insertUser");
+			ErrorInfo objErrorInfo = objDataExp.getErrorInfo();
+			LogUtil
+			.logMessage("ENters into catch block in UserMaintDAO.insertUser"
+					+ objErrorInfo.getMessageID());
+			throw new BusinessException(objDataExp, objErrorInfo);
+		} 
+		catch (Exception objExp) {
+			LogUtil.logMessage("Enters into Exception UserMaintDAO.insertUser");
+			ErrorInfo objErrorInfo = new ErrorInfo();
+			objErrorInfo.setMessage(ApplicationConstants.LOG_USER + strLogUser
+					+ "-" + objExp.getMessage());
+			throw new ApplicationException(objExp, objErrorInfo);
+		}
+		
+		finally {
+			try {
+				
+				DBHelper.closeSQLObjects(null, objCallableStatement,
+						objConnection);
+				DBHelper.closeSQLObjects(null, cs, con);
+			}
+			
+			catch (Exception objExp) {
+				LogUtil
+				.logMessage("Enters into Exception UserMaintDAO.insertUser");
+				ErrorInfo objErrorInfo = new ErrorInfo();
+				objErrorInfo.setMessage(ApplicationConstants.LOG_USER
+						+ strLogUser + "-" + objExp.getMessage());
+				throw new ApplicationException(objExp, objErrorInfo);
+			}
+			
+		}
+		
+		return intStatusCode;
+	}
+	
